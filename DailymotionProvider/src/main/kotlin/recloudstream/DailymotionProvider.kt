@@ -35,38 +35,36 @@ class DailymotionProvider : MainAPI() {
     override var lang = "en"
     override val hasMainPage = true
 
-    // --- XỬ LÝ CATALOGUE ---
+    // --- MAIN PAGE ---
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePages = mutableListOf<HomePageList>()
         
-        // 1. Lấy danh sách Following (Tăng limit để lấy nhiều User hơn làm Catalogue)
+        // 1. Lấy danh sách Following
         val followingUrl = "$mainUrl/user/taunt-preface-runt/following?fields=id,screenname&limit=10"
         val followingRes = app.get(followingUrl).text
         val users = tryParseJson<FollowingResponse>(followingRes)?.list ?: emptyList()
 
-        // 2. Với mỗi User, ta xử lý như một Catalogue riêng biệt
+        // 2. Load các trang playlist theo biến 'page' khi người dùng cuộn dọc
         users.forEach { user ->
-            // Sử dụng page của Cloudstream để lấy các bộ phim tiếp theo cho từng hàng
             val playlistUrl = "$mainUrl/user/${user.id}/playlists?fields=id,name,thumbnail_360_url&limit=20&page=$page"
             val playlistRes = app.get(playlistUrl).text
             
             tryParseJson<PlaylistSearchResponse>(playlistRes)?.list?.let { playlists ->
                 if (playlists.isNotEmpty()) {
+                    // ĐÃ XÓA THAM SỐ LỖI: Cloudstream mặc định dàn hàng ngang cho list này
                     homePages.add(HomePageList(
                         name = "${user.screenname} (P.$page)", 
                         list = playlists.map { 
                             newMovieSearchResponse(it.name, "https://www.dailymotion.com/playlist/${it.id}", TvType.TvSeries) {
                                 this.posterUrl = it.thumbnail360Url
                             }
-                        },
-                        horizontal = true // ĐÃ SỬA: Thay isHorizontal thành horizontal
+                        }
                     ))
                 }
             }
         }
 
-        // hasNext = true để khi bạn cuộn dọc xuống dưới cùng, nó sẽ gọi trang 2, trang 3...
-        // cho TẤT CẢ các User cùng lúc, giúp cập nhật thêm phim mới vào các hàng
+        // hasNext = true để Cloudstream tự động tăng 'page' khi lướt xuống cuối
         return newHomePageResponse(homePages, users.isNotEmpty())
     }
 
@@ -81,7 +79,7 @@ class DailymotionProvider : MainAPI() {
         return results?.toNewSearchResponseList()
     }
 
-    // --- LOAD (Lấy toàn bộ video trong Playlist) ---
+    // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
         val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
