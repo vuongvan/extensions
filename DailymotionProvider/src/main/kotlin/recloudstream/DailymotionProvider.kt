@@ -47,7 +47,7 @@ class DailymotionProvider : MainAPI() {
 
         // 2. Với mỗi User trong trang hiện tại, lấy nhiều Playlist hơn (tăng limit lên 20)
         users.forEach { user ->
-            val playlistUrl = "$mainUrl/user/${user.id}/playlists?fields=id,name,thumbnail_360_url&limit=20"
+            val playlistUrl = "$mainUrl/user/${user.id}/playlists?fields=id,name,thumbnail_360_url&limit=20&page=$page"
             val playlistRes = app.get(playlistUrl).text
             tryParseJson<PlaylistSearchResponse>(playlistRes)?.list?.let { playlists ->
                 if (playlists.isNotEmpty()) {
