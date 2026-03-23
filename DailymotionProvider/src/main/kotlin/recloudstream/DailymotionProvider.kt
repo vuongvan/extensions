@@ -20,7 +20,14 @@ class DailymotionProvider : MainAPI() {
     data class PlaylistItem(
         @JsonProperty("id") val id: String,
         @JsonProperty("name") val name: String,
-        @JsonProperty("thumbnail_360_url") val thumbnail360Url: String? = null
+        @JsonProperty("thumbnail_360_url") val thumbnail360Url: String? = null,
+        @JsonProperty("owner.screenname") val ownerName: String? = null
+    )
+
+    data class FollowingResponse(@JsonProperty("list") val list: List<UserItem>)
+    data class UserItem(
+        @JsonProperty("screenname") val screenname: String,
+        @JsonProperty("id") val id: String
     )
 
     override var mainUrl = "https://api.dailymotion.com"
@@ -33,36 +40,44 @@ class DailymotionProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePages = mutableListOf<HomePageList>()
 
-        // 1. Video phổ biến (Có phân trang)
+        if (page <= 1) {
+            // 1. Lấy danh sách những người bạn đang theo dõi (Following) - Tối đa 10
+            val followingUrl = "$mainUrl/user/taunt-preface-runt/following?fields=id,screenname&limit=10"
+            val followingRes = app.get(followingUrl).text
+            val users = tryParseJson<FollowingResponse>(followingRes)?.list ?: emptyList()
+
+            // 2. Với mỗi User, lấy danh sách Playlist của họ
+            users.forEach { user ->
+                val playlistUrl = "$mainUrl/user/${user.id}/playlists?fields=id,name,thumbnail_360_url&limit=5"
+                val playlistRes = app.get(playlistUrl).text
+                tryParseJson<PlaylistSearchResponse>(playlistRes)?.list?.let { playlists ->
+                    if (playlists.isNotEmpty()) {
+                        homePages.add(HomePageList(
+                            "${user.screenname}'s Playlists", 
+                            playlists.map { 
+                                newMovieSearchResponse(it.name, "https://www.dailymotion.com/playlist/${it.id}", TvType.TvSeries) {
+                                    this.posterUrl = it.thumbnail360Url
+                                }
+                            }
+                        ))
+                    }
+                }
+            }
+        }
+
+        // 3. Phần Video phổ biến vẫn để ở cuối hoặc trang sau để đa dạng nội dung
         val videoRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page").text
         tryParseJson<VideoSearchResponse>(videoRes)?.list?.let { items ->
-            if (items.isNotEmpty()) {
-                homePages.add(HomePageList("Popular Videos", items.map { 
-                    newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
-                        this.posterUrl = it.thumbnail360Url
-                    }
-                }))
-            }
+            homePages.add(HomePageList("Global Popular Videos", items.map { 
+                newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
+                    this.posterUrl = it.thumbnail360Url
+                }
+            }))
         }
 
-        // 2. Playlist của người dùng thientam.nguyen (Có phân trang)
-        // Thêm tham số page=$page để khi kéo xuống Cloudstream sẽ gọi trang tiếp theo
-        val userPlaylistRes = app.get("$mainUrl/user/thientam.nguyen/playlists?fields=id,name,thumbnail_360_url&limit=20&page=$page").text
-        tryParseJson<PlaylistSearchResponse>(userPlaylistRes)?.list?.let { items ->
-            if (items.isNotEmpty()) {
-                homePages.add(HomePageList("thientam.nguyen's Playlists", items.map { 
-                    newMovieSearchResponse(it.name, "https://www.dailymotion.com/playlist/${it.id}", TvType.TvSeries) {
-                        this.posterUrl = it.thumbnail360Url
-                    }
-                }))
-            }
-        }
-
-        // Trả về true ở tham số cuối để Cloudstream biết là vẫn còn trang tiếp theo để load
         return newHomePageResponse(homePages, true)
     }
 
-    // --- SEARCH ---
     override suspend fun search(query: String, page: Int): SearchResponseList? {
         val vRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&search=$query").text
         val results = tryParseJson<VideoSearchResponse>(vRes)?.list?.map { 
@@ -73,7 +88,6 @@ class DailymotionProvider : MainAPI() {
         return results?.toNewSearchResponseList()
     }
 
-    // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
         val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
@@ -81,7 +95,6 @@ class DailymotionProvider : MainAPI() {
             val detailRes = app.get("$mainUrl/playlist/$id?fields=id,name,thumbnail_720_url").text
             val detail = tryParseJson<PlaylistItem>(detailRes) ?: return null
             
-            // Lấy tối đa 100 video trong playlist (Dailymotion cho phép limit cao ở đây)
             val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url&limit=100").text
             val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
 
@@ -103,7 +116,6 @@ class DailymotionProvider : MainAPI() {
         }
     }
 
-    // --- LOAD LINKS ---
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
