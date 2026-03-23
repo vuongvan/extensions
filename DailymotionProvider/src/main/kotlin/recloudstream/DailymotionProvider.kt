@@ -35,25 +35,26 @@ class DailymotionProvider : MainAPI() {
     override var lang = "en"
     override val hasMainPage = true
 
-    // --- MAIN PAGE ---
+    // --- MAIN PAGE (Đã áp dụng logic chuẩn từ OPhim) ---
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePages = mutableListOf<HomePageList>()
         
-        // 1. Lấy danh sách Following
-        val followingUrl = "$mainUrl/user/taunt-preface-runt/following?fields=id,screenname&limit=10"
+        // 1. LẤY DANH SÁCH USER (CỐ ĐỊNH, KHÔNG DÙNG BIẾN PAGE Ở ĐÂY)
+        // Chúng ta lấy 1 lần 10 người bạn đang theo dõi để làm 10 danh mục (Categories)
+        // Nếu dùng biến page ở đây, danh sách user sẽ bị đổi khi cuộn xuống làm hỏng việc gộp hàng.
+        val followingUrl = "$mainUrl/user/taunt-preface-runt/following?fields=id,screenname&limit=10&page=1"
         val followingRes = app.get(followingUrl).text
         val users = tryParseJson<FollowingResponse>(followingRes)?.list ?: emptyList()
 
-        // 2. Load các trang playlist theo biến 'page' khi người dùng cuộn dọc
+        // 2. LẤY PLAYLIST CHO TỪNG USER VÀ DÙNG BIẾN PAGE ĐỂ PHÂN TRANG NGANG
         users.forEach { user ->
             val playlistUrl = "$mainUrl/user/${user.id}/playlists?fields=id,name,thumbnail_360_url&limit=20&page=$page"
             val playlistRes = app.get(playlistUrl).text
             
             tryParseJson<PlaylistSearchResponse>(playlistRes)?.list?.let { playlists ->
                 if (playlists.isNotEmpty()) {
-                    // ĐÃ XÓA THAM SỐ LỖI: Cloudstream mặc định dàn hàng ngang cho list này
                     homePages.add(HomePageList(
-                        name = "${user.screenname} (P.$page)", 
+                        name = user.screenname, // QUAN TRỌNG: Tên phải cố định để Cloudstream tự gộp ngang
                         list = playlists.map { 
                             newMovieSearchResponse(it.name, "https://www.dailymotion.com/playlist/${it.id}", TvType.TvSeries) {
                                 this.posterUrl = it.thumbnail360Url
@@ -64,8 +65,8 @@ class DailymotionProvider : MainAPI() {
             }
         }
 
-        // hasNext = true để Cloudstream tự động tăng 'page' khi lướt xuống cuối
-        return newHomePageResponse(homePages, users.isNotEmpty())
+        // Trả về hasNext = true để báo cho Cloudstream biết cứ lướt xuống là lấy tiếp Trang 2, Trang 3...
+        return newHomePageResponse(homePages, hasNext = true)
     }
 
     // --- SEARCH ---
