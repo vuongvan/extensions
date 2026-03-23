@@ -91,7 +91,7 @@ class DailymotionProvider : MainAPI() {
             val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url&limit=100").text
             val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
 
-            return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.map { video ->
+            return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.reversed().map { video ->
                 newEpisode("https://www.dailymotion.com/video/${video.id}") {
                     this.name = video.title
                     this.posterUrl = video.thumbnail360Url
