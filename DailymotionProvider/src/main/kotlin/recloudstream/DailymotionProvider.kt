@@ -70,7 +70,33 @@ class DailymotionProvider : MainAPI() {
     }
 
     // --- SEARCH ---
-    override suspend fun search(query: String, page: Int): SearchResponseList? {
+        override suspend fun search(query: String, page: Int): SearchResponseList? {
+        // 1. Kiểm tra nếu người dùng dán Link Video hoặc Playlist
+        val videoId = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(query)?.groups?.get(1)?.value
+        
+        if (query.startsWith("http") && videoId != null) {
+            if (query.contains("/playlist/")) {
+                // Nếu là link Playlist -> Lấy thông tin playlist đó
+                val res = app.get("$mainUrl/playlist/$videoId?fields=id,name,thumbnail_360_url").text
+                val it = tryParseJson<PlaylistItem>(res) ?: return null
+                return listOf(
+                    newMovieSearchResponse(it.name, "https://www.dailymotion.com/playlist/${it.id}", TvType.TvSeries) {
+                        this.posterUrl = it.thumbnail360Url
+                    }
+                ).toNewSearchResponseList()
+            } else {
+                // Nếu là link Video -> Lấy thông tin video đó
+                val res = app.get("$mainUrl/video/$videoId?fields=id,title,thumbnail_360_url").text
+                val it = tryParseJson<VideoItem>(res) ?: return null
+                return listOf(
+                    newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
+                        this.posterUrl = it.thumbnail360Url
+                    }
+                ).toNewSearchResponseList()
+            }
+        }
+
+        // 2. Nếu không phải Link, thực hiện tìm kiếm bình thường (đã thêm sort=relevance)
         val vRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&search=$query&sort=relevance").text
         val results = tryParseJson<VideoSearchResponse>(vRes)?.list?.map { 
             newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
@@ -79,6 +105,7 @@ class DailymotionProvider : MainAPI() {
         }
         return results?.toNewSearchResponseList()
     }
+
 
     // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
