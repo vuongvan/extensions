@@ -71,7 +71,7 @@ class DailymotionProvider : MainAPI() {
 
     // --- SEARCH ---
     override suspend fun search(query: String, page: Int): SearchResponseList? {
-        val vRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&search=$query").text
+        val vRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&search=$query&sort=relevance").text
         val results = tryParseJson<VideoSearchResponse>(vRes)?.list?.map { 
             newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
                 this.posterUrl = it.thumbnail360Url
