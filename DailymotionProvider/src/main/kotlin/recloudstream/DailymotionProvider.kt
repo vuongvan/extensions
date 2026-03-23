@@ -80,29 +80,41 @@ class DailymotionProvider : MainAPI() {
 
     // --- LOAD (Xử lý cả Video và Playlist) ---
 
-    override suspend fun load(url: String): LoadResponse? {
-    return if (url.contains("/playlist/")) {
-        val playlistId = Regex("playlist/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
-        val detailRes = app.get("$mainUrl/playlist/$playlistId?fields=id,name,description,thumbnail_720_url").text
-        val detail = tryParseJson<PlaylistItem>(detailRes) ?: return null
-        
-        val videosRes = app.get("$mainUrl/playlist/$playlistId/videos?fields=id,title,thumbnail_360_url&limit=100").text
-        val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
+        override suspend fun load(url: String): LoadResponse? {
+        // 1. Lấy ID từ URL (dùng chung cho cả video và playlist)
+        val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
-        newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.map { video ->
-            // Sửa lỗi tại đây
-            newEpisode(video.id) {
-                this.name = video.title
-                this.posterUrl = video.thumbnail360Url
+        // 2. Nếu là Playlist
+        if (url.contains("/playlist/")) {
+            val detailRes = app.get("$mainUrl/playlist/$id?fields=id,name,description,thumbnail_720_url").text
+            val detail = tryParseJson<PlaylistItem>(detailRes) ?: return null
+            
+            val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url&limit=100").text
+            val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
+
+            // Trả về TvSeriesLoadResponse
+            return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.map { video ->
+                newEpisode(video.id) {
+                    this.name = video.title
+                    this.posterUrl = video.thumbnail360Url
+                }
+            }) {
+                this.posterUrl = detail.thumbnail360Url
+                this.plot = "Dailymotion Playlist"
             }
-        }) {
-            this.posterUrl = detail.thumbnail360Url
-            this.plot = "Playlist content"
         }
-    } else {
-        // ... (phần code cho Video đơn lẻ giữ nguyên)
-    }
-    }
+
+        // 3. Nếu là Video đơn lẻ (mặc định)
+        val response = app.get("$mainUrl/video/$id?fields=id,title,description,thumbnail_720_url").text
+        val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
+        
+        // Trả về MovieLoadResponse
+        return newMovieLoadResponse(videoDetail.title, url, TvType.Movie, videoDetail.id) {
+            this.plot = videoDetail.description
+            this.posterUrl = videoDetail.thumbnail720Url
+        }
+        }
+        
     
 
     // --- EXTRACTOR ---
