@@ -71,12 +71,54 @@ class DailymotionProvider : MainAPI() {
 
     // --- SEARCH ---
 
+        // --- SEARCH (Tìm cả Video và Playlist) ---
+
     override suspend fun search(query: String, page: Int): SearchResponseList? {
-        val response = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=26&page=$page&search=${query.encodeUri()}").text
-        return tryParseJson<VideoSearchResponse>(response)?.list?.map {
-            it.toSearchResponse()
-        }?.toNewSearchResponseList()
+        // Chạy song song 2 request để tối ưu tốc độ
+        val videoResponse = ioSafe { 
+            app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page&search=${query.encodeUri()}").text 
+        }
+        val playlistResponse = ioSafe { 
+            app.get("$mainUrl/playlists?fields=id,name,thumbnail_360_url&limit=10&page=$page&search=${query.encodeUri()}").text 
+        }
+
+        val results = mutableListOf<SearchResponse>()
+
+        // Xử lý kết quả Video
+        tryParseJson<VideoSearchResponse>(videoResponse)?.list?.forEach {
+            results.add(it.toSearchResponse())
+        }
+
+        // Xử lý kết quả Playlist
+        tryParseJson<PlaylistSearchResponse>(playlistResponse)?.list?.forEach {
+            results.add(it.toSearchResponse())
+        }
+
+        return results.toNewSearchResponseList()
     }
+
+    // --- CẬP NHẬT LẠI CÁC HÀM HELPER (Để tránh nhầm lẫn) ---
+
+    private fun VideoItem.toSearchResponse(): SearchResponse {
+        return newMovieSearchResponse(
+            this.title, 
+            "https://www.dailymotion.com/video/${this.id}", 
+            TvType.Movie // Video lẻ coi như Movie
+        ) {
+            this.posterUrl = thumbnail360Url
+        }
+    }
+
+    private fun PlaylistItem.toSearchResponse(): SearchResponse {
+        return newMovieSearchResponse(
+            this.name, 
+            "https://www.dailymotion.com/playlist/${this.id}", 
+            TvType.TvSeries // Playlist coi như TvSeries (nhiều tập)
+        ) {
+            this.posterUrl = thumbnail360Url
+        }
+    }
+    
 
     // --- LOAD (Xử lý cả Video và Playlist) ---
 
