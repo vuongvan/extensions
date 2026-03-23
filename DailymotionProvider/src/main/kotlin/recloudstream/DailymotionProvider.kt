@@ -42,7 +42,7 @@ class DailymotionProvider : MainAPI() {
     override var mainUrl = "https://api.dailymotion.com"
     override var name = "Dailymotion"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Others)
-    override var lang = "en"
+    override var lang = "vi"
     override val hasMainPage = true
 
     // --- MAIN PAGE ---
