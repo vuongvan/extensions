@@ -125,17 +125,16 @@ class DailymotionProvider : MainAPI() {
             if (match != null) {
                 val m3u8Url = match.groupValues[1].replace("\\/", "/")
                 
-                // SỬA TẠI ĐÂY: Chuyển các tham số vào trong block { }
+                // SỬA TẠI ĐÂY: Truyền trực tiếp vào tham số của hàm
                 callback.invoke(
                     newExtractorLink(
                         source = this.name,
                         name = "Dailymotion Direct",
                         url = m3u8Url,
-                    ) {
-                        this.referer = "https://www.dailymotion.com/"
-                        this.quality = Qualities.Unknown.value
-                        this.isM3u8 = true
-                    }
+                        referer = "https://www.dailymotion.com/", // Truyền trực tiếp
+                        quality = Qualities.Unknown.value,        // Truyền trực tiếp
+                        isM3u8 = true                             // Truyền trực tiếp
+                    )
                 )
                 return true
             }
@@ -143,6 +142,7 @@ class DailymotionProvider : MainAPI() {
 
         return loadExtractor("https://www.dailymotion.com/video/$data", subtitleCallback, callback)
         }
+        
 
         
 
