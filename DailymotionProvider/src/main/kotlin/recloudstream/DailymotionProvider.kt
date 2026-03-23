@@ -130,9 +130,9 @@ class DailymotionProvider : MainAPI() {
                 // Xử lý chuỗi URL (xóa các ký tự escape JSON)
                 val m3u8Url = match.groupValues[1].replace("\\/", "/")
                 
-                // 3. Trả link trực tiếp cho player của Cloudstream
+                // 3. Sử dụng newExtractorLink theo yêu cầu mới của Cloudstream
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = this.name,
                         name = "Dailymotion Direct",
                         url = m3u8Url,
@@ -146,6 +146,15 @@ class DailymotionProvider : MainAPI() {
         } catch (e: Exception) {
             e.printStackTrace() // Bỏ qua lỗi để chạy phương án dự phòng
         }
+
+        // 4. Phương án dự phòng (Fallback): Dùng Extractor của Cloudstream
+        return loadExtractor(
+            "https://www.dailymotion.com/video/$data",
+            subtitleCallback,
+            callback
+        )
+        }
+        
 
         // 4. Phương án dự phòng (Fallback): Dùng Extractor của Cloudstream với link Embed
         return loadExtractor(
