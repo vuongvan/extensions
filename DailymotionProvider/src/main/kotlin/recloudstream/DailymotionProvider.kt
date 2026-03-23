@@ -4,14 +4,12 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.StringUtils.encodeUri
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink // Import quan trọng
 
 class DailymotionProvider : MainAPI() {
 
-    // --- 1. DATA CLASSES (Nằm trong Class) ---
+    // --- DATA CLASSES ---
     data class VideoSearchResponse(@JsonProperty("list") val list: List<VideoItem>)
     data class VideoItem(
         @JsonProperty("id") val id: String,
@@ -39,23 +37,23 @@ class DailymotionProvider : MainAPI() {
     override var lang = "en"
     override val hasMainPage = true
 
-    // --- 2. MAIN PAGE ---
+    // --- MAIN PAGE ---
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val homePages = mutableListOf<HomePageList>()
 
-        // Video phổ biến
+        // 1. Video phổ biến
         val videoRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20&page=$page").text
         tryParseJson<VideoSearchResponse>(videoRes)?.list?.let { items ->
             homePages.add(HomePageList("Popular Videos", items.map { it.toVideoSearchResponse() }))
         }
 
-        // Playlist của thientam.nguyen
+        // 2. Playlist của người dùng thientam.nguyen
         val userPlaylistRes = app.get("$mainUrl/user/thientam.nguyen/playlists?fields=id,name,thumbnail_360_url&limit=20").text
         tryParseJson<PlaylistSearchResponse>(userPlaylistRes)?.list?.let { items ->
             homePages.add(HomePageList("thientam.nguyen's Playlists", items.map { it.toPlaylistSearchResponse() }))
         }
 
-        // Playlist phổ biến
+        // 3. Playlist hệ thống phổ biến
         val playlistRes = app.get("$mainUrl/playlists?fields=id,name,thumbnail_360_url&limit=20&page=$page").text
         tryParseJson<PlaylistSearchResponse>(playlistRes)?.list?.let { items ->
             homePages.add(HomePageList("Featured Playlists", items.map { it.toPlaylistSearchResponse() }))
@@ -64,7 +62,7 @@ class DailymotionProvider : MainAPI() {
         return newHomePageResponse(homePages, false)
     }
 
-    // --- 3. SEARCH ---
+    // --- SEARCH ---
     override suspend fun search(query: String, page: Int): SearchResponseList? {
         val results = mutableListOf<SearchResponse>()
         val encodedQuery = query.encodeUri()
@@ -78,7 +76,7 @@ class DailymotionProvider : MainAPI() {
         return results.toNewSearchResponseList()
     }
 
-    // --- 4. LOAD ---
+    // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
         val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
@@ -89,8 +87,9 @@ class DailymotionProvider : MainAPI() {
             val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url&limit=100").text
             val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
 
+            // QUAN TRỌNG: Truyền URL video đầy đủ vào Episode để loadLinks nhận diện được
             return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.map { video ->
-                newEpisode(video.id) {
+                newEpisode("https://www.dailymotion.com/video/${video.id}") {
                     this.name = video.title
                     this.posterUrl = video.thumbnail360Url
                 }
@@ -100,63 +99,5 @@ class DailymotionProvider : MainAPI() {
             }
         }
 
-        val response = app.get("$mainUrl/video/$id?fields=id,title,description,thumbnail_720_url").text
-        val videoDetail = tryParseJson<VideoDetailResponse>(response) ?: return null
-        
-        return newMovieLoadResponse(videoDetail.title, url, TvType.Movie, videoDetail.id) {
-            this.plot = videoDetail.description
-            this.posterUrl = videoDetail.thumbnail720Url
-        }
-    }
-
-    // --- 5. LOAD LINKS ---
-                override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        try {
-            val metaUrl = "https://www.dailymotion.com/player/metadata/video/$data"
-            val response = app.get(metaUrl).text
-            val m3u8Regex = """"type":"application/x-mpegURL","url":"([^"]+)"""".toRegex()
-            val match = m3u8Regex.find(response)
-            
-            if (match != null) {
-                val m3u8Url = match.groupValues[1].replace("\\/", "/")
-                
-                callback.invoke(
-                    newExtractorLink(
-                        source = this.name,
-                        name = "Dailymotion Direct",
-                        url = m3u8Url
-                    ) { // Dấu ngoặc nhọn bắt đầu ở đây
-                        this.referer = "https://www.dailymotion.com/"
-                        // Lưu ý: Không dùng dấu "=" nếu bị lỗi val, hãy dùng hàm setter nếu có 
-                        // Nhưng thông thường trong DSL của Cloudstream là gán trực tiếp:
-                    }
-                )
-                return true
-            }
-        } catch (e: Exception) { e.printStackTrace() }
-
-        return loadExtractor("https://www.dailymotion.com/video/$data", subtitleCallback, callback)
-                }
-                
-            
-
-        
-
-    // --- 6. HELPERS (Đổi tên để tránh Ambiguity) ---
-    private fun VideoItem.toVideoSearchResponse(): SearchResponse {
-        return newMovieSearchResponse(this.title, "https://www.dailymotion.com/video/${this.id}", TvType.Movie) {
-            this.posterUrl = thumbnail360Url
-        }
-    }
-
-    private fun PlaylistItem.toPlaylistSearchResponse(): SearchResponse {
-        return newMovieSearchResponse(this.name, "https://www.dailymotion.com/playlist/${this.id}", TvType.TvSeries) {
-            this.posterUrl = thumbnail360Url
-        }
-    }
-}
+        val response = app.get("$main
+                               
