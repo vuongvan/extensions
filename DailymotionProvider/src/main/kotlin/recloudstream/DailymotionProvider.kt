@@ -110,7 +110,7 @@ class DailymotionProvider : MainAPI() {
     }
 
     // --- 5. LOAD LINKS ---
-            override suspend fun loadLinks(
+                override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
@@ -125,24 +125,24 @@ class DailymotionProvider : MainAPI() {
             if (match != null) {
                 val m3u8Url = match.groupValues[1].replace("\\/", "/")
                 
-                // SỬA CHUẨN TẠI ĐÂY:
-                val link = newExtractorLink(
-                    source = this.name,
-                    name = "Dailymotion Direct",
-                    url = m3u8Url
+                callback.invoke(
+                    newExtractorLink(
+                        source = this.name,
+                        name = "Dailymotion Direct",
+                        url = m3u8Url
+                    ) { // Dấu ngoặc nhọn bắt đầu ở đây
+                        this.referer = "https://www.dailymotion.com/"
+                        // Lưu ý: Không dùng dấu "=" nếu bị lỗi val, hãy dùng hàm setter nếu có 
+                        // Nhưng thông thường trong DSL của Cloudstream là gán trực tiếp:
+                    }
                 )
-                // Gán thuộc tính thủ công để tránh lỗi No parameter và Val reassigned
-                link.referer = "https://www.dailymotion.com/"
-                link.quality = Qualities.Unknown.value
-                link.isM3u8 = true
-                
-                callback.invoke(link)
                 return true
             }
         } catch (e: Exception) { e.printStackTrace() }
 
         return loadExtractor("https://www.dailymotion.com/video/$data", subtitleCallback, callback)
-            }
+                }
+                
             
 
         
