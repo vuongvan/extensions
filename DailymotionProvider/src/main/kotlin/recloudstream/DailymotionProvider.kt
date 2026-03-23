@@ -61,7 +61,8 @@ class DailymotionProvider : MainAPI() {
                     ))
                 }
             }
-            
+            return newHomePageResponse(homePages, true)
+    
         }
 
         // 3. Thêm một hàng Video phổ biến ở cuối trang 1
