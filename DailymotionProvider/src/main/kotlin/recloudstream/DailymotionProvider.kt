@@ -61,22 +61,14 @@ class DailymotionProvider : MainAPI() {
                     ))
                 }
             }
+            
         }
 
         // 3. Thêm một hàng Video phổ biến ở cuối trang 1
-        if (page == 1) {
-            val videoRes = app.get("$mainUrl/videos?fields=id,title,thumbnail_360_url&limit=20").text
-            tryParseJson<VideoSearchResponse>(videoRes)?.list?.let { items ->
-                homePages.add(HomePageList("Global Popular Videos", items.map { 
-                    newMovieSearchResponse(it.title, "https://www.dailymotion.com/video/${it.id}", TvType.Movie) {
-                        this.posterUrl = it.thumbnail360Url
-                    }
-                }))
-            }
-        }
+        
 
         // hasNext = true để Cloudstream tiếp tục gọi trang tiếp theo khi bạn lướt xuống
-        return newHomePageResponse(homePages, users.isNotEmpty())
+        return newHomePageResponse(homePages, true)
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList? {
