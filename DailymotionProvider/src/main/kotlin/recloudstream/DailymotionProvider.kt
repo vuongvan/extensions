@@ -144,6 +144,7 @@ class DailymotionProvider : MainAPI() {
         this.posterUrl = v.thumbnail360Url
         // Hiển thị thời lượng trong phần thông tin phim
         this.duration = v.duration?.let { it / 60 } 
+        this.runTime =  v.duration
     }
     }
     
