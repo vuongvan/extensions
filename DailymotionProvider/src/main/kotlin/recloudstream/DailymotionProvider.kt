@@ -128,6 +128,7 @@ class DailymotionProvider : MainAPI() {
             newEpisode("https://www.dailymotion.com/video/${video.id}") {
                 this.name = video.title
                 this.posterUrl = video.thumbnail360Url
+                this.runTime =  video.duration
                 // Hiển thị thời lượng ở phần mô tả tập phim
                 this.description = if (durationMin != null) "Thời lượng: ${durationMin}p ${durationSec}s" else null
             }
@@ -144,7 +145,7 @@ class DailymotionProvider : MainAPI() {
         this.posterUrl = v.thumbnail360Url
         // Hiển thị thời lượng trong phần thông tin phim
         this.duration = v.duration?.let { it / 60 } 
-        this.runTime =  v.duration
+        
     }
     }
     
