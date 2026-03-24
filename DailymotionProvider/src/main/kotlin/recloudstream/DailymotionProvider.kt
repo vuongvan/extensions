@@ -11,10 +11,12 @@ class DailymotionProvider : MainAPI() {
     // --- DATA CLASSES ---
     data class VideoSearchResponse(@JsonProperty("list") val list: List<VideoItem>)
     data class VideoItem(
-        @JsonProperty("id") val id: String,
-        @JsonProperty("title") val title: String,
-        @JsonProperty("thumbnail_360_url") val thumbnail360Url: String? = null
-    )
+    @JsonProperty("id") val id: String,
+    @JsonProperty("title") val title: String,
+    @JsonProperty("thumbnail_360_url") val thumbnail360Url: String? = null,
+    @JsonProperty("duration") val duration: Int? = null // Thời lượng tính bằng giây
+)
+
 
     data class PlaylistSearchResponse(@JsonProperty("list") val list: List<PlaylistItem>)
     data class PlaylistItem(
@@ -109,32 +111,43 @@ class DailymotionProvider : MainAPI() {
 
     // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
-        val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
+    override suspend fun load(url: String): LoadResponse? {
+    val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
-        if (url.contains("/playlist/")) {
-            val detailRes = app.get("$mainUrl/playlist/$id?fields=id,name,thumbnail_720_url").text
-            val detail = tryParseJson<PlaylistItem>(detailRes) ?: return null
-            
-            val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url&limit=100").text
-            val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
-
-            return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.reversed().map { video ->
-                newEpisode("https://www.dailymotion.com/video/${video.id}") {
-                    this.name = video.title
-                    this.posterUrl = video.thumbnail360Url
-                }
-            }) {
-                this.posterUrl = detail.thumbnail360Url
-            }
-        }
-
-        val response = app.get("$mainUrl/video/$id?fields=id,title,thumbnail_720_url").text
-        val v = tryParseJson<VideoItem>(response) ?: return null
+    if (url.contains("/playlist/")) {
+        val detailRes = app.get("$mainUrl/playlist/$id?fields=id,name,thumbnail_720_url").text
+        val detail = tryParseJson<PlaylistItem>(detailRes) ?: return null
         
-        return newMovieLoadResponse(v.title, url, TvType.Movie, "https://www.dailymotion.com/video/${v.id}") {
-            this.posterUrl = v.thumbnail360Url
+        // Thêm "duration" vào fields
+        val videosRes = app.get("$mainUrl/playlist/$id/videos?fields=id,title,thumbnail_360_url,duration&limit=100").text
+        val videos = tryParseJson<VideoSearchResponse>(videosRes)?.list ?: emptyList()
+
+        return newTvSeriesLoadResponse(detail.name, url, TvType.TvSeries, videos.reversed().map { video ->
+            val durationMin = video.duration?.let { it / 60 } // Đổi sang phút
+            val durationSec = video.duration?.let { it % 60 } // Giây dư ra
+            
+            newEpisode("https://www.dailymotion.com/video/${video.id}") {
+                this.name = video.title
+                this.posterUrl = video.thumbnail360Url
+                // Hiển thị thời lượng ở phần mô tả tập phim
+                this.description = if (durationMin != null) "Thời lượng: ${durationMin}p ${durationSec}s" else null
+            }
+        }) {
+            this.posterUrl = detail.thumbnail360Url
         }
     }
+
+    // Xử lý cho link Video đơn lẻ
+    val response = app.get("$mainUrl/video/$id?fields=id,title,thumbnail_720_url,duration").text
+    val v = tryParseJson<VideoItem>(response) ?: return null
+    
+    return newMovieLoadResponse(v.title, url, TvType.Movie, "https://www.dailymotion.com/video/${v.id}") {
+        this.posterUrl = v.thumbnail360Url
+        // Hiển thị thời lượng trong phần thông tin phim
+        this.duration = v.duration?.let { it / 60 } 
+    }
+    }
+    
 
     override suspend fun loadLinks(
         data: String,
