@@ -111,7 +111,6 @@ class DailymotionProvider : MainAPI() {
 
     // --- LOAD ---
     override suspend fun load(url: String): LoadResponse? {
-    override suspend fun load(url: String): LoadResponse? {
     val id = Regex("(?:video|playlist)/([a-zA-Z0-9]+)").find(url)?.groups?.get(1)?.value ?: return null
 
     if (url.contains("/playlist/")) {
